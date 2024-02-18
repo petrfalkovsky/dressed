@@ -1,0 +1,16 @@
+name: auth
+description: auth service
+version: 1.0.1
+
+environment:
+  sdk: ^3.0.5
+
+dependencies:
+  conduit: ^4.4.0
+  conduit_core: ^4.4.0
+  conduit_postgresql: ^4.4.0
+  jaguar_jwt: 3.0.0
+
+dev_dependencies:
+  lints: ^2.0.0
+  test: ^1.21.0
