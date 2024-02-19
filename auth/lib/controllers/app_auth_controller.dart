@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:auth/models/response_model.dart';
 import 'package:auth/models/user.dart';
+import 'package:auth/utils/app_utils.dart';
 import 'package:conduit_core/conduit_core.dart';
 import 'package:jaguar_jwt/jaguar_jwt.dart';
 
@@ -54,7 +55,7 @@ class AppAuthController extends ResourceController {
     }
 
     final salt = generateRandomSalt();
-    final hashPassword = generatePasswordHash(user.password ?? "", salt ?? "");
+    final hashPassword = generatePasswordHash(user.password ?? "", salt);
 
     try {
       late final int id;
@@ -91,23 +92,19 @@ class AppAuthController extends ResourceController {
   @Operation.post('refresh')
   Future<Response> refreshToken(
       @Bind.path("refresh") String refreshToken) async {
-    final User fetshedUser = User();
-
-    // подклбчение к базе данных
-    // найти пользователя по токену
-    // проверить  токен
-    // получить пользователя
-
-    return Response.ok(
-      AppResponseModel(
-        data: {
-          "id": fetshedUser.id,
-          "refreshToken": fetshedUser.refreshToken,
-          "accesToken": fetshedUser.accessToken,
-        },
+    try {
+      final id = AppUtils.getIdFromToken(refreshToken);
+      await _updateTokens(id, managedContext);
+      final user = await managedContext.fetchObjectWithID<User>(id);
+      return Response.ok(AppResponseModel(
+        data: user?.backing.contents,
         message: "Успешное обновление токенов",
-      ).toJson(),
-    );
+      ));
+    } on QueryException catch (error) {
+      return Response.serverError(
+        body: AppResponseModel(message: error.message),
+      );
+    }
   }
 
   Map<String, dynamic> _getTokens(int id) {
