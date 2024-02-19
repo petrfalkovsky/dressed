@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:auth/models/response_model.dart';
 import 'package:auth/models/user.dart';
+import 'package:auth/utils/app_response.dart';
 import 'package:auth/utils/app_utils.dart';
 import 'package:conduit_core/conduit_core.dart';
 import 'package:jaguar_jwt/jaguar_jwt.dart';
@@ -34,14 +35,13 @@ class AppAuthController extends ResourceController {
         await _updateTokens(findUser.id ?? -1, managedContext);
         final newUser =
             await managedContext.fetchObjectWithID<User>(findUser.id);
-        return Response.ok(AppResponseModel(
-            data: newUser?.backing.contents, message: "Успешная авторизация"));
+        return AppResponse.ok(
+            body: newUser?.backing.contents, message: "Успешная авторизация");
       } else {
         throw QueryException.input("Пароль не верный", []);
       }
-    } on QueryException catch (error) {
-      return Response.serverError(
-          body: AppResponseModel(message: error.message));
+    } catch (error) {
+      return AppResponse.serverError(error, message: "Ошибка авторизации");
     }
   }
 
@@ -75,18 +75,13 @@ class AppAuthController extends ResourceController {
           ..values.refreshToken = tokens["refresh"];
         await qUpdateTokens.updateOne();
       });
-// если все ок то
+
       final userData = await managedContext.fetchObjectWithID<User>(id);
-      return Response.ok(AppResponseModel(
-          data: userData?.backing.contents, message: "Успешная регистрация"));
-    } on QueryException catch (error) {
-      return Response.serverError(
-        body: AppResponseModel(message: error.message),
-      );
+      return AppResponse.ok(
+          body: userData?.backing.contents, message: "Успешная регистрация");
+    } catch (error) {
+      return AppResponse.serverError(error, message: "Ошибка регистрация");
     }
-    // подклбчиться к базе данных
-    // создаем пользвоателя
-    // получаем его данные
   }
 
   @Operation.post('refresh')
@@ -94,16 +89,21 @@ class AppAuthController extends ResourceController {
       @Bind.path("refresh") String refreshToken) async {
     try {
       final id = AppUtils.getIdFromToken(refreshToken);
-      await _updateTokens(id, managedContext);
       final user = await managedContext.fetchObjectWithID<User>(id);
-      return Response.ok(AppResponseModel(
-        data: user?.backing.contents,
-        message: "Успешное обновление токенов",
-      ));
-    } on QueryException catch (error) {
-      return Response.serverError(
-        body: AppResponseModel(message: error.message),
-      );
+      if (user?.refreshToken != refreshToken) {
+        return Response.unauthorized(
+            body: AppResponseModel(message: "Токен не валиден"));
+      } else {
+        await _updateTokens(id, managedContext);
+        final user = await managedContext.fetchObjectWithID<User>(id);
+        return AppResponse.ok(
+          body: user?.backing.contents,
+          message: "Успешное обновление токенов",
+        );
+      }
+    } catch (error) {
+      return AppResponse.serverError(error,
+          message: "Ошибка обновления токенов");
     }
   }
 
